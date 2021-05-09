@@ -222,4 +222,15 @@ public interface XpTrackerConfig extends Config
 	{
 		return true;
 	}
+
+	@ConfigItem(
+		position = 15,
+		keyName = "virtualLevelStatsPanel",
+		name = "Virtual levels in stats panel",
+		description = "Configures whether virtual levels are shown in the stats panel"
+	)
+	default boolean virtualLevelStatsPanel()
+	{
+		return true;
+	}
 }

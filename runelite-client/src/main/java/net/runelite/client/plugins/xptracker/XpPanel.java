@@ -43,6 +43,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
+import net.runelite.api.Experience;
 import net.runelite.api.Skill;
 import net.runelite.api.WorldType;
 import net.runelite.client.game.SkillIconManager;
@@ -53,6 +54,7 @@ import net.runelite.client.ui.components.DragAndDropReorderPane;
 import net.runelite.client.ui.components.PluginErrorPanel;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
+import net.runelite.client.util.QuantityFormatter;
 import okhttp3.HttpUrl;
 import org.apache.commons.lang3.StringUtils;
 
@@ -234,6 +236,8 @@ class XpPanel extends PluginPanel
 		{
 			xpInfoBox.update(updated, paused, xpSnapshotSingle);
 		}
+
+		updateSkillPanelTooltip(skill);
 	}
 
 	void updateTotal(XpSnapshotSingle xpSnapshotTotal)
@@ -257,11 +261,13 @@ class XpPanel extends PluginPanel
 	{
 		overallExpGained.setText(XpInfoBox.htmlLabel("Gained: ", xpSnapshotTotal.getXpGainedInSession()));
 		overallExpHour.setText(XpInfoBox.htmlLabel("Per hour: ", xpSnapshotTotal.getXpPerHour()));
+
+		updateAllSkillPanelTooltips();
 	}
 
 	/**
-	 *  Builds a JPanel displaying an icon and level/number associated with it
-	 *  Simplified version of HiscorePanel.makeHiscorePanel
+	 * Builds a JPanel displaying an icon and level/number associated with it
+	 * Simplified version of HiscorePanel.makeHiscorePanel
 	 */
 	private JPanel makeSkillPanel(Skill skill)
 	{
@@ -288,15 +294,54 @@ class XpPanel extends PluginPanel
 		return skillPanel;
 	}
 
-	private static String pad(String str)
+	private void setSkillPanelTooltip(Skill skill)
 	{
-		// Left pad label text to keep labels aligned
-		return StringUtils.leftPad(str, 2);
+		String content = "";
+		String openingTags = "<html><body style = 'padding: 5px;color:#989898'>";
+		String closingTags = "</html><body>";
+
+		if (skill == Skill.OVERALL)
+		{
+			String totalXpString = QuantityFormatter.formatNumber(client.getOverallExperience());
+			content += "<p><span style = 'color:white'>Total XP:</span> " + totalXpString + "</p>";
+		}
+		else
+		{
+			int currentXp = client.getSkillExperience(skill);
+			int currentLevel = Experience.getLevelForXp(currentXp);
+
+			String currentXpString = QuantityFormatter.formatNumber(currentXp);
+			String nextLevelXpString;
+			String remainingXpString;
+			if (currentLevel + 1 <= Experience.MAX_VIRT_LEVEL)
+			{
+				int nextLevelXp = Experience.getXpForLevel(currentLevel + 1);
+				nextLevelXpString = QuantityFormatter.formatNumber(nextLevelXp);
+				remainingXpString = QuantityFormatter.formatNumber(nextLevelXp - currentXp);
+			}
+			else
+			{
+				nextLevelXpString = "--";
+				remainingXpString = "0";
+			}
+
+			content += "<p><span style = 'color:white'>" + skill.getName() + "XP:</span> " + currentXpString + "</p>";
+			content += "<p><span style = 'color:white'>Next level at:</span> " + nextLevelXpString + "</p>";
+			content += "<p><span style = 'color:white'>Remaining XP:</span> " + remainingXpString + "</p>";
+		}
+
+		skillLabels.get(skill).setToolTipText(openingTags + content + closingTags);
 	}
 
 	void updateSkillStatsPanel(Skill skill)
 	{
-		skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getRealSkillLevel(skill)), 2));
+		int level = Experience.getLevelForXp(client.getSkillExperience(skill));
+		if (!xpTrackerConfig.virtualLevelStatsPanel() && level > 99)
+		{
+			level = 99;
+		}
+
+		skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(level), 2));
 		skillLabels.get(Skill.OVERALL).setText(StringUtils.leftPad(String.valueOf(client.getTotalLevel()), 2));
 	}
 
@@ -307,19 +352,37 @@ class XpPanel extends PluginPanel
 			statsPanel.setVisible(xpTrackerConfig.showStatsPanel());
 		}
 
-		if (statsPanel.isVisible())
+		int level;
+		for (Skill skill : skillLabels.keySet())
 		{
-			for (Skill skill : skillLabels.keySet())
+			if (skill == Skill.OVERALL)
 			{
-				if (skill == Skill.OVERALL)
-				{
-					skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getTotalLevel()), 2));
-				}
-				else
-				{
-					skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getRealSkillLevel(skill)), 2));
-				}
+				skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getTotalLevel()), 2));
 			}
+			else
+			{
+				level = Experience.getLevelForXp(client.getSkillExperience(skill));
+				if (!xpTrackerConfig.virtualLevelStatsPanel() && level > 99)
+				{
+					level = 99;
+				}
+
+				skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(level), 2));
+			}
+		}
+	}
+
+	void updateSkillPanelTooltip(Skill skill)
+	{
+		setSkillPanelTooltip(skill);
+		setSkillPanelTooltip(Skill.OVERALL);
+	}
+
+	void updateAllSkillPanelTooltips()
+	{
+		for (Skill skill : skillLabels.keySet())
+		{
+			setSkillPanelTooltip(skill);
 		}
 	}
 }
