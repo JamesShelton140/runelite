@@ -25,9 +25,12 @@
  */
 package net.runelite.client.plugins.xptracker;
 
+import com.google.common.collect.ImmutableList;
 import java.awt.BorderLayout;
 import java.awt.GridLayout;
+import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.swing.BoxLayout;
 import javax.swing.ImageIcon;
@@ -48,8 +51,10 @@ import net.runelite.client.ui.FontManager;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.DragAndDropReorderPane;
 import net.runelite.client.ui.components.PluginErrorPanel;
+import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.LinkBrowser;
 import okhttp3.HttpUrl;
+import org.apache.commons.lang3.StringUtils;
 
 class XpPanel extends PluginPanel
 {
@@ -63,9 +68,32 @@ class XpPanel extends PluginPanel
 	/* This displays the "No exp gained" text */
 	private final PluginErrorPanel errorPanel = new PluginErrorPanel();
 
+	private final XpTrackerConfig xpTrackerConfig;
+	private final Client client;
+
+	/**
+	 * Skills, ordered in the way they should be displayed in the panel.
+	 */
+	private static final List<Skill> SKILLS = ImmutableList.of(
+		Skill.ATTACK, Skill.HITPOINTS, Skill.MINING,
+		Skill.STRENGTH, Skill.AGILITY, Skill.SMITHING,
+		Skill.DEFENCE, Skill.HERBLORE, Skill.FISHING,
+		Skill.RANGED, Skill.THIEVING, Skill.COOKING,
+		Skill.PRAYER, Skill.CRAFTING, Skill.FIREMAKING,
+		Skill.MAGIC, Skill.FLETCHING, Skill.WOODCUTTING,
+		Skill.RUNECRAFT, Skill.SLAYER, Skill.FARMING,
+		Skill.CONSTRUCTION, Skill.HUNTER, Skill.OVERALL
+	);
+
+	private final Map<Skill, JLabel> skillLabels = new EnumMap<>(Skill.class);
+
+	private final JPanel statsPanel = new JPanel();
+
 	XpPanel(XpTrackerPlugin xpTrackerPlugin, XpTrackerConfig xpTrackerConfig, Client client, SkillIconManager iconManager)
 	{
 		super();
+		this.client = client;
+		this.xpTrackerConfig = xpTrackerConfig;
 
 		setBorder(new EmptyBorder(6, 6, 6, 6));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -143,6 +171,21 @@ class XpPanel extends PluginPanel
 			infoBoxes.put(skill, new XpInfoBox(xpTrackerPlugin, xpTrackerConfig, client, infoBoxPanel, skill, iconManager));
 		}
 
+		// Panel that holds skill icons
+		statsPanel.setLayout(new GridLayout(8, 3));
+		statsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		statsPanel.setBorder(new EmptyBorder(10, 10, 10, 10));
+		statsPanel.setVisible(xpTrackerConfig.showStatsPanel());
+
+		// For each skill on the ingame skill panel, create a Label and add it to the UI
+		for (Skill skill : SKILLS)
+		{
+			JPanel panel = makeSkillPanel(skill);
+			statsPanel.add(panel);
+		}
+		//stats panel is added to parent to force it to fix to the bottom of the panel
+		this.getParent().add(statsPanel, BorderLayout.SOUTH);
+
 		errorPanel.setContent("Exp trackers", "You have not gained experience yet.");
 		add(errorPanel);
 	}
@@ -216,4 +259,67 @@ class XpPanel extends PluginPanel
 		overallExpHour.setText(XpInfoBox.htmlLabel("Per hour: ", xpSnapshotTotal.getXpPerHour()));
 	}
 
+	/**
+	 *  Builds a JPanel displaying an icon and level/number associated with it
+	 *  Simplified version of HiscorePanel.makeHiscorePanel
+	 */
+	private JPanel makeSkillPanel(Skill skill)
+	{
+		JLabel label = new JLabel();
+		label.setToolTipText(skill.getName());
+		label.setFont(FontManager.getRunescapeSmallFont());
+		label.setText(StringUtils.leftPad("--", 2));
+
+		String directory = "/skill_icons_small/";
+		String skillName = (skill.name().toLowerCase());
+		String skillIcon = directory + skillName + ".png";
+//		log.debug("Loading skill icon from {}", skillIcon);
+
+		label.setIcon(new ImageIcon(ImageUtil.loadImageResource(getClass(), skillIcon)));
+
+		label.setIconTextGap(4);
+
+		JPanel skillPanel = new JPanel();
+		skillPanel.setBackground(ColorScheme.DARKER_GRAY_COLOR);
+		skillPanel.setBorder(new EmptyBorder(2, 0, 2, 0));
+		skillLabels.put(skill, label);
+		skillPanel.add(label);
+
+		return skillPanel;
+	}
+
+	private static String pad(String str)
+	{
+		// Left pad label text to keep labels aligned
+		return StringUtils.leftPad(str, 2);
+	}
+
+	void updateSkillStatsPanel(Skill skill)
+	{
+		skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getRealSkillLevel(skill)), 2));
+		skillLabels.get(Skill.OVERALL).setText(StringUtils.leftPad(String.valueOf(client.getTotalLevel()), 2));
+	}
+
+	void updateAllStatsPanel()
+	{
+		if (statsPanel.isVisible() != xpTrackerConfig.showStatsPanel())
+		{
+			statsPanel.setVisible(xpTrackerConfig.showStatsPanel());
+		}
+
+		if (statsPanel.isVisible())
+		{
+			for (Skill skill : skillLabels.keySet())
+			{
+				if (skill == Skill.OVERALL)
+				{
+					skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getTotalLevel()), 2));
+				}
+				else
+				{
+					skillLabels.get(skill).setText(StringUtils.leftPad(String.valueOf(client.getRealSkillLevel(skill)), 2));
+				}
+			}
+		}
+	}
 }

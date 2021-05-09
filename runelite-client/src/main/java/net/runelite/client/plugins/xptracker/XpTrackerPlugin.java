@@ -61,6 +61,7 @@ import net.runelite.api.widgets.WidgetID;
 import static net.runelite.api.widgets.WidgetInfo.TO_GROUP;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.game.NPCManager;
 import net.runelite.client.game.SkillIconManager;
 import net.runelite.client.plugins.Plugin;
@@ -181,6 +182,18 @@ public class XpTrackerPlugin extends Plugin
 		overlayManager.removeIf(e -> e instanceof XpInfoBoxOverlay);
 		xpState.reset();
 		clientToolbar.removeNavigation(navButton);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (event.getGroup().equals("xptracker"))
+		{
+			if (client != null)
+			{
+				xpPanel.updateAllStatsPanel();
+			}
+		}
 	}
 
 	@Subscribe
@@ -319,6 +332,7 @@ public class XpTrackerPlugin extends Plugin
 		xpState.reset();
 		xpPanel.resetAllInfoBoxes();
 		xpPanel.updateTotal(new XpSnapshotSingle.XpSnapshotSingleBuilder().build());
+		xpPanel.updateAllStatsPanel();
 		overlayManager.removeIf(e -> e instanceof XpInfoBoxOverlay);
 	}
 
@@ -415,6 +429,12 @@ public class XpTrackerPlugin extends Plugin
 		// Also update the total experience
 		xpState.updateSkill(Skill.OVERALL, client.getOverallExperience(), -1, -1);
 		xpPanel.updateTotal(xpState.getTotalSnapshot());
+
+		//Also update the stats panel
+		if (xpTrackerConfig.showStatsPanel())
+		{
+			xpPanel.updateSkillStatsPanel(skill);
+		}
 	}
 
 	@Subscribe
@@ -751,6 +771,8 @@ public class XpTrackerPlugin extends Plugin
 		}
 
 		xpPanel.updateTotal(xpState.getTotalSnapshot());
+
+		xpPanel.updateAllStatsPanel();
 	}
 
 	void pauseSkill(Skill skill, boolean pause)

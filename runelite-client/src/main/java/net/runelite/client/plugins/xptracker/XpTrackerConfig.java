@@ -211,4 +211,15 @@ public interface XpTrackerConfig extends Config
 	{
 		return false;
 	}
+
+	@ConfigItem(
+		position = 14,
+		keyName = "showStatsPanel",
+		name = "Show stats panel",
+		description = "Configures whether a stats panel is displayed in the XpTracker"
+	)
+	default boolean showStatsPanel()
+	{
+		return true;
+	}
 }
